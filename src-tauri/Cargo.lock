@@ -3557,7 +3557,7 @@ dependencies = [
 
 [[package]]
 name = "recodex"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "arboard",
  "base64 0.22.1",
