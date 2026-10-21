@@ -1,0 +1,12 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "recording-toolbar",
+  "description": "Allows the toolbar to listen for recording state and start native window dragging.",
+  "windows": ["recording-toolbar"],
+  "permissions": [
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-size",
+    "core:event:allow-listen",
+    "core:event:allow-unlisten"
+  ]
+}

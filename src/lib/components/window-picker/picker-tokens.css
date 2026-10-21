@@ -1,0 +1,22 @@
+:root {
+  --wp-bg: #101116;
+  --wp-surface: #17191f;
+  --wp-surface-raised: #1b1d24;
+  --wp-surface-hover: #20222a;
+  --wp-footer: #131419;
+  --wp-border: #30313a;
+  --wp-border-muted: #292b33;
+  --wp-border-strong: #555762;
+  --wp-border-hover: #686a75;
+  --wp-text: #f5f5f7;
+  --wp-text-secondary: #d1d2d9;
+  --wp-muted: #989aa7;
+  --wp-muted-strong: #62646f;
+  --wp-accent: #ff3038;
+  --wp-accent-bright: #ff454d;
+  --wp-accent-soft: #ff9095;
+  --wp-disabled-surface: #402125;
+  --wp-disabled-border: #4a2529;
+  --wp-disabled-text: #8c6669;
+  --wp-white: #ffffff;
+}

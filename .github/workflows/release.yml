@@ -1,0 +1,213 @@
+name: Release RecoDex
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: recodex-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  quality:
+    name: Validate release
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Verify release tag and app versions
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { readFileSync } from 'node:fs';
+
+          const packageVersion = JSON.parse(readFileSync('package.json', 'utf8')).version;
+          const tauriVersion = JSON.parse(readFileSync('src-tauri/tauri.conf.json', 'utf8')).version;
+          const cargoManifest = readFileSync('src-tauri/Cargo.toml', 'utf8');
+          const cargoVersion = cargoManifest.match(/^\[package\][\s\S]*?^version\s*=\s*"([^"]+)"/m)?.[1];
+          const expectedTag = `v${packageVersion}`;
+
+          if (process.env.GITHUB_REPOSITORY !== 'duongonix/recodex') {
+            throw new Error(`This release workflow only publishes duongonix/recodex, not ${process.env.GITHUB_REPOSITORY}`);
+          }
+
+          if (!cargoVersion || new Set([packageVersion, tauriVersion, cargoVersion]).size !== 1) {
+            throw new Error(`Version mismatch: package.json=${packageVersion}, tauri.conf.json=${tauriVersion}, Cargo.toml=${cargoVersion ?? 'missing'}`);
+          }
+
+          if (process.env.GITHUB_REF_NAME !== expectedTag) {
+            throw new Error(`Release tag ${process.env.GITHUB_REF_NAME} must match app version tag ${expectedTag}`);
+          }
+
+          console.log(`Releasing RecoDex ${packageVersion} from ${expectedTag}`);
+          NODE
+
+      - name: Require the updater signing key
+        shell: bash
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [[ -z "$TAURI_SIGNING_PRIVATE_KEY" ]]; then
+            echo "Missing repository Actions secret TAURI_SIGNING_PRIVATE_KEY."
+            exit 1
+          fi
+
+      - name: Type check
+        run: npm run check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm run test
+
+      - name: Build frontend
+        run: npm run build
+
+  build-and-upload:
+    name: Build ${{ matrix.name }}
+    needs: quality
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      # tauri-action updates latest.json for each target. Serial uploads avoid
+      # races while the action replaces that shared release asset.
+      max-parallel: 1
+      matrix:
+        include:
+          - name: Windows x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            bundles: nsis
+            apple_identity: ""
+          - name: Windows ARM64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            bundles: nsis
+            apple_identity: ""
+          - name: macOS Intel
+            runner: macos-15-intel
+            target: x86_64-apple-darwin
+            bundles: dmg
+            apple_identity: "-"
+          - name: macOS Apple Silicon
+            runner: macos-15
+            target: aarch64-apple-darwin
+            bundles: dmg
+            apple_identity: "-"
+          - name: Linux x64
+            runner: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+            bundles: appimage,deb,rpm
+            apple_identity: ""
+          - name: Linux ARM64
+            runner: ubuntu-22.04-arm
+            target: aarch64-unknown-linux-gnu
+            bundles: appimage,deb,rpm
+            apple_identity: ""
+    env:
+      # GITHUB_TOKEN uploads release assets; this separate secret signs updater bundles.
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ matrix.apple_identity }}
+    steps:
+      - name: Checkout release tag
+        uses: actions/checkout@v7
+
+      - name: Install Linux system dependencies
+        if: startsWith(matrix.target, 'x86_64-unknown-linux') || startsWith(matrix.target, 'aarch64-unknown-linux')
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes \
+            build-essential \
+            curl \
+            file \
+            libayatana-appindicator3-dev \
+            libfuse2 \
+            libgtk-3-dev \
+            libssl-dev \
+            libv4l-dev \
+            libwebkit2gtk-4.1-dev \
+            librsvg2-dev \
+            patchelf \
+            libxdo-dev \
+            rpm \
+            squashfs-tools \
+            wget \
+            xdg-utils
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust stable and target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+
+      - name: Cache Rust build
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and upload signed bundles
+        uses: tauri-apps/tauri-action@v1
+        with:
+          owner: duongonix
+          repo: recodex
+          tagName: ${{ github.ref_name }}
+          releaseName: RecoDex ${{ github.ref_name }}
+          releaseBody: "Install the package matching your operating system and processor. Windows uses the NSIS installer; Linux AppImage users receive in-app updates, while DEB/RPM users update through their package manager."
+          generateReleaseNotes: true
+          releaseDraft: true
+          prerelease: false
+          uploadUpdaterJson: true
+          updaterJsonPreferNsis: true
+          retryAttempts: 2
+          args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+
+  publish-release:
+    name: Publish complete release
+    needs: build-and-upload
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - name: Publish the draft after all six builds succeed
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          REPOSITORY: ${{ github.repository }}
+        shell: bash
+        run: |
+          release_id="$(gh api "repos/${REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          if [[ -z "$release_id" || "$release_id" == "null" ]]; then
+            echo "Could not find the draft release for ${RELEASE_TAG}."
+            exit 1
+          fi
+
+          gh api --method PATCH "repos/${REPOSITORY}/releases/${release_id}" -F draft=false
+          echo "Published ${REPOSITORY} release ${RELEASE_TAG}."

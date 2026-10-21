@@ -1,0 +1,58 @@
+{
+  "name": "recodex",
+  "version": "0.1.0",
+  "description": "Lightweight desktop screen recorder and screenshot app",
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build",
+    "test": "vitest run",
+    "preview": "vite preview",
+    "prepare": "svelte-kit sync || echo ''",
+    "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
+    "check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+    "lint": "eslint .",
+    "tauri": "tauri"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@lucide/svelte": "^1.58.0",
+    "@tauri-apps/api": "^2",
+    "@tauri-apps/plugin-autostart": "^2.7.0",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "@tauri-apps/plugin-notification": "^2.7.0",
+    "@tauri-apps/plugin-process": "^2.4.0",
+    "@tauri-apps/plugin-updater": "^2.14.0",
+    "clsx": "^2.1.1",
+    "konva": "^10.9.0",
+    "shadcn-svelte": "^1.7.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@internationalized/date": "^3.12.4",
+    "@sveltejs/adapter-static": "^4.0.0",
+    "@sveltejs/kit": "^3.0.0",
+    "@sveltejs/load-config": "^0.2.2",
+    "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "@tailwindcss/vite": "^4.3.3",
+    "@tauri-apps/cli": "^2",
+    "@types/node": "^26.6.5",
+    "bits-ui": "^2.19.5",
+    "eslint": "^10.12.0",
+    "eslint-plugin-svelte": "^3.23.1",
+    "globals": "^17.13.0",
+    "svelte": "^5.57.1",
+    "svelte-check": "^4.7.5",
+    "tailwind-variants": "^3.3.1",
+    "tailwindcss": "^4.3.3",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.2",
+    "vite": "^8.0.16",
+    "vitest": "^5.0.5"
+  },
+  "imports": {
+    "#lib": "./src/lib/index.js",
+    "#lib/*": "./src/lib/*"
+  }
+}

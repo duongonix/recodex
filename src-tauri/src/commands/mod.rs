@@ -1,0 +1,13 @@
+pub mod audio;
+pub mod capture;
+pub mod recording;
+pub mod recording_review;
+pub mod recording_shutdown;
+pub mod recording_windows;
+pub mod region;
+pub mod screenshot;
+pub mod settings;
+pub mod shortcuts;
+pub mod sources;
+pub mod webcam;
+pub mod window_picker;

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "region-overlay",
+  "description": "Region overlay uses window-validated application commands and listens for picker state updates.",
+  "windows": ["region-overlay"],
+  "permissions": ["core:event:allow-listen", "core:event:allow-unlisten"]
+}

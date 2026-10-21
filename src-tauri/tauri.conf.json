@@ -1,0 +1,118 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "RecoDex",
+  "version": "0.1.0",
+  "identifier": "app.recodex.recorder",
+  "build": {
+    "beforeDevCommand": "npm run dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "npm run build",
+    "frontendDist": "../build"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "RecoDex",
+        "width": 400,
+        "height": 490,
+        "resizable": false,
+        "decorations": false,
+        "center": true
+      },
+      {
+        "label": "recording-toolbar",
+        "title": "RecoDex Recording Controls",
+        "url": "recording-toolbar",
+        "width": 620,
+        "height": 58,
+        "resizable": false,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "contentProtected": true,
+        "skipTaskbar": true,
+        "visible": false
+      },
+      {
+        "label": "recording-review",
+        "title": "Video Editor — RecoDex",
+        "url": "recording-review",
+        "width": 1280,
+        "height": 820,
+        "minWidth": 960,
+        "minHeight": 620,
+        "resizable": true,
+        "decorations": false,
+        "visible": false
+      },
+      {
+        "label": "webcam-overlay",
+        "title": "RecoDex Webcam Overlay",
+        "url": "webcam-overlay",
+        "width": 180,
+        "height": 135,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "contentProtected": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
+      },
+      {
+        "label": "region-overlay",
+        "title": "Select Capture Region",
+        "url": "region-overlay",
+        "width": 800,
+        "height": 600,
+        "resizable": false,
+        "decorations": false,
+        "transparent": true,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": false,
+        "visible": false
+      }
+    ],
+    "security": {
+      "csp": null,
+      "capabilities": [
+        "main-window",
+        "recording-toolbar",
+        "recording-review",
+        "webcam-overlay",
+        "region-overlay",
+        "window-picker",
+        "screenshot-editor"
+      ],
+      "assetProtocol": {
+        "enable": true,
+        "scope": []
+      }
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDNFOUFFNzEyNDY2NjQ4RTcKUldUblNHWkdFdWVhUG0zL0ZXZkZoLzFQWEdFcEpnZzRLeS9BbmZtVzR1dm1VeWpWZng0SURtNXIK",
+      "endpoints": [
+        "https://github.com/duongonix/recodex/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}

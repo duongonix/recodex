@@ -1,0 +1,11 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "window-picker",
+  "description": "The native window picker listens for its own selection lifecycle events and supports dragging its frameless window.",
+  "windows": ["window-picker"],
+  "permissions": [
+    "core:event:allow-listen",
+    "core:event:allow-unlisten",
+    "core:window:allow-start-dragging"
+  ]
+}
