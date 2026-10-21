@@ -26,6 +26,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Pin npm to the lockfile generator version
+        run: npm install --global npm@11.17.0
+
       - name: Install frontend dependencies
         run: npm ci
 
@@ -159,6 +162,9 @@ jobs:
         with:
           node-version: 22
           cache: npm
+
+      - name: Pin npm to the lockfile generator version
+        run: npm install --global npm@11.17.0
 
       - name: Install Rust stable and target
         uses: dtolnay/rust-toolchain@stable
