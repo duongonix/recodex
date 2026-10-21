@@ -209,7 +209,8 @@ jobs:
           REPOSITORY: ${{ github.repository }}
         shell: bash
         run: |
-          release_id="$(gh api "repos/${REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          # Draft releases are omitted by the tag lookup endpoint, so find it in the release list.
+          release_id="$(gh api "repos/${REPOSITORY}/releases?per_page=100" | jq -r --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)][0].id // empty')"
           if [[ -z "$release_id" || "$release_id" == "null" ]]; then
             echo "Could not find the draft release for ${RELEASE_TAG}."
             exit 1
