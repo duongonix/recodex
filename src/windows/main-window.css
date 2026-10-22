@@ -23,7 +23,8 @@ body {
 }
 
 .main-window.settings-open,
-.main-window.about-open {
+.main-window.about-open,
+.main-window.update-open {
   grid-template-rows: 42px minmax(0, 1fr);
   align-content: stretch;
 }

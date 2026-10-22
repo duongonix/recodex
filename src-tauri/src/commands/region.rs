@@ -15,6 +15,7 @@ use crate::{
 
 const REGION_PICKER_OPENED_EVENT: &str = "capture://region-picker-opened";
 const REGION_SELECTED_EVENT: &str = "capture://region-selected";
+const REGION_CANCELLED_EVENT: &str = "capture://region-picker-cancelled";
 
 #[tauri::command]
 pub fn open_region_picker(
@@ -124,7 +125,9 @@ pub fn cancel_region_picker(
 ) -> Result<(), IpcError> {
     require_window(&window, "region-overlay")?;
     close_overlay_and_restore_main(&app)?;
-    set_picker_state(&state, None)
+    set_picker_state(&state, None)?;
+    let _ = app.emit_to("main", REGION_CANCELLED_EVENT, ());
+    Ok(())
 }
 
 fn get_overlay(app: &AppHandle) -> Result<WebviewWindow, IpcError> {

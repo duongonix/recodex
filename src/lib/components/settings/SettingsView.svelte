@@ -12,7 +12,7 @@
   import WebcamConfiguration from "../webcam/WebcamConfiguration.svelte";
   import type { RecordingPreflightReport } from "../../types/recording.js";
   import type { AppSettings, SettingsPatch } from "../../types/settings.js";
-  import type { HoldZoomShortcutStatus, QuickAccessShortcutStatus } from "../../types/shortcuts.js";
+  import type { CaptureHotkeyStatus, HoldZoomShortcutStatus, QuickAccessShortcutStatus } from "../../types/shortcuts.js";
   import type { SettingsTab } from "../../types/settings-view.js";
   import "./settings.css";
 
@@ -22,6 +22,7 @@
     saving,
     error,
     shortcutStatus,
+    captureHotkeyStatus,
     shortcutError,
     startupLabel,
     startupSupported,
@@ -50,6 +51,7 @@
     saving: boolean;
     error: string | null;
     shortcutStatus: QuickAccessShortcutStatus | null;
+    captureHotkeyStatus: CaptureHotkeyStatus[] | null;
     shortcutError: string | null;
     startupLabel: string;
     startupSupported: boolean;
@@ -156,7 +158,7 @@
           />
         </TabsContent>
         <TabsContent value="hotkey" class="settings-panel">
-          <HotkeySettings {shortcutStatus} {shortcutError} />
+          <HotkeySettings {shortcutStatus} {captureHotkeyStatus} {shortcutError} />
         </TabsContent>
       {:else}
         <p class="settings-loading" role="status">Loading saved preferences…</p>

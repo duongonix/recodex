@@ -101,8 +101,11 @@ impl RecordingWebcam {
                                 app,
                                 &format!("Webcam overlay was disabled: {}", error.message),
                             );
-                        } else if let Some(warning) = webcam.image_warning() {
-                            emit_warning(app, warning);
+                        } else {
+                            webcam.enabled = true;
+                            if let Some(warning) = webcam.image_warning() {
+                                emit_warning(app, warning);
+                            }
                         }
                     }
                     Err(error) => emit_warning(app, &error.message),

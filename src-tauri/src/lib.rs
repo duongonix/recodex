@@ -49,6 +49,7 @@ pub fn run() {
                 .map_err(|error| std::io::Error::other(error.message))?;
             shortcut::register_quick_access(app.handle());
             shortcut::register_hold_zoom_shortcut(app.handle());
+            shortcut::register_capture_hotkeys(app.handle());
             system_tray::install(app)?;
             Ok(())
         })
@@ -102,6 +103,7 @@ pub fn run() {
             commands::webcam::stop_webcam_preview,
             commands::webcam::get_webcam_background_preview,
             commands::shortcuts::get_quick_access_shortcut_status,
+            commands::shortcuts::get_capture_hotkey_status,
             commands::shortcuts::get_hold_zoom_shortcut_status
         ])
         .run(tauri::generate_context!())

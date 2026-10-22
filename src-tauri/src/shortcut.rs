@@ -1,11 +1,54 @@
 use serde::{Deserialize, Serialize};
-use tauri::{AppHandle, Manager};
+use tauri::{AppHandle, Emitter, Manager};
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 use crate::{app_state::AppState, recording::SessionStatus};
 
 pub const QUICK_ACCESS_ACCELERATOR: &str = "CommandOrControl+Alt+Shift+R";
 pub const DEFAULT_HOLD_ZOOM_ACCELERATOR: &str = "CommandOrControl+Shift+Z";
+pub const CAPTURE_HOTKEY_EVENT: &str = "capture://hotkey";
+
+#[derive(Clone, Copy)]
+struct CaptureHotkeyBinding {
+    action: &'static str,
+    accelerator: &'static str,
+}
+
+const CAPTURE_HOTKEY_BINDINGS: [CaptureHotkeyBinding; 6] = [
+    CaptureHotkeyBinding {
+        action: "record-screen",
+        accelerator: "CommandOrControl+Shift+Alt+1",
+    },
+    CaptureHotkeyBinding {
+        action: "record-window",
+        accelerator: "CommandOrControl+Shift+Alt+2",
+    },
+    CaptureHotkeyBinding {
+        action: "record-region",
+        accelerator: "CommandOrControl+Shift+Alt+3",
+    },
+    CaptureHotkeyBinding {
+        action: "screenshot-screen",
+        accelerator: "CommandOrControl+Shift+Alt+4",
+    },
+    CaptureHotkeyBinding {
+        action: "screenshot-window",
+        accelerator: "CommandOrControl+Shift+Alt+5",
+    },
+    CaptureHotkeyBinding {
+        action: "screenshot-region",
+        accelerator: "CommandOrControl+Shift+Alt+6",
+    },
+];
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CaptureHotkeyStatus {
+    pub action: String,
+    pub accelerator: String,
+    pub registered: bool,
+    pub message: Option<String>,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -108,6 +151,43 @@ pub fn register_hold_zoom_shortcut(app: &AppHandle) {
     set_zoom_status(app, status);
 }
 
+pub fn register_capture_hotkeys(app: &AppHandle) {
+    let statuses = CAPTURE_HOTKEY_BINDINGS
+        .iter()
+        .copied()
+        .map(|binding| {
+            let registration = Shortcut::try_from(binding.accelerator)
+                .map_err(|error| format!("Invalid shortcut: {error}"))
+                .and_then(|shortcut| {
+                    let action = binding.action;
+                    app.global_shortcut()
+                        .on_shortcut(shortcut, move |app, _, event| {
+                            if event.state == ShortcutState::Pressed {
+                                let _ = app.emit_to("main", CAPTURE_HOTKEY_EVENT, action);
+                            }
+                        })
+                        .map_err(|error| error.to_string())
+                });
+            CaptureHotkeyStatus {
+                action: binding.action.to_owned(),
+                accelerator: binding.accelerator.to_owned(),
+                registered: registration.is_ok(),
+                message: registration.err().map(|error| {
+                    format!(
+                        "Could not register this shortcut: {error}. Another app may already use it."
+                    )
+                }),
+            }
+        })
+        .collect();
+
+    if let Some(state) = app.try_state::<AppState>()
+        && let Ok(mut stored) = state.capture_hotkeys.lock()
+    {
+        *stored = statuses;
+    }
+}
+
 /// Applies shortcut registration after settings have been saved; callers serialize updates.
 pub fn update_hold_zoom_shortcut(
     app: &AppHandle,
@@ -168,11 +248,18 @@ pub fn update_hold_zoom_shortcut(
 
 pub fn validate_hold_zoom_shortcut(accelerator: &str) -> Result<(), crate::errors::IpcError> {
     let shortcut = parse_zoom_shortcut(accelerator)?;
-    let quick_access = parse_zoom_shortcut(QUICK_ACCESS_ACCELERATOR)?;
-    if shortcut.id() == quick_access.id() {
+    let conflicts_with_registered_action = std::iter::once(QUICK_ACCESS_ACCELERATOR)
+        .chain(
+            CAPTURE_HOTKEY_BINDINGS
+                .iter()
+                .map(|binding| binding.accelerator),
+        )
+        .filter_map(|accelerator| Shortcut::try_from(accelerator).ok())
+        .any(|registered| shortcut.id() == registered.id());
+    if conflicts_with_registered_action {
         return Err(crate::errors::IpcError::new(
             "shortcut_conflict",
-            "Hold-to-zoom cannot use the global quick-access shortcut.",
+            "Hold-to-zoom cannot use a shortcut reserved for RecoDex capture actions.",
             true,
         ));
     }
@@ -184,11 +271,18 @@ fn register_zoom_binding(
     accelerator: &str,
 ) -> Result<(), crate::errors::IpcError> {
     let shortcut = parse_zoom_shortcut(accelerator)?;
-    let quick_access = parse_zoom_shortcut(QUICK_ACCESS_ACCELERATOR)?;
-    if shortcut.id() == quick_access.id() {
+    let conflicts_with_capture_action = std::iter::once(QUICK_ACCESS_ACCELERATOR)
+        .chain(
+            CAPTURE_HOTKEY_BINDINGS
+                .iter()
+                .map(|binding| binding.accelerator),
+        )
+        .filter_map(|accelerator| Shortcut::try_from(accelerator).ok())
+        .any(|registered| shortcut.id() == registered.id());
+    if conflicts_with_capture_action {
         return Err(crate::errors::IpcError::new(
             "shortcut_conflict",
-            "Hold-to-zoom cannot use the global quick-access shortcut.",
+            "Hold-to-zoom cannot use a shortcut reserved for RecoDex capture actions.",
             true,
         ));
     }

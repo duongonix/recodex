@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { listen } from "@tauri-apps/api/event";
   import "./main-window.css";
   import Camera from "@lucide/svelte/icons/camera";
@@ -13,11 +13,16 @@
   import ScreenshotOptions from "../lib/components/recorder/ScreenshotOptions.svelte";
   import SettingsView from "../lib/components/settings/SettingsView.svelte";
   import AboutView from "../lib/components/about/AboutView.svelte";
+  import UpdateView from "../lib/components/shared/UpdateView.svelte";
   import WindowTitleBar from "../lib/components/recorder/WindowTitleBar.svelte";
   import ActiveRecordingPanel from "../lib/components/recorder/ActiveRecordingPanel.svelte";
   import VideoOptions from "../lib/components/recorder/VideoOptions.svelte";
   import { getCaptureCapabilities, getCapturePermissions } from "../lib/services/ipc/capture.js";
-  import { getHoldZoomShortcutStatus, getQuickAccessShortcutStatus } from "../lib/services/ipc/shortcuts.js";
+  import {
+    getCaptureHotkeyStatus,
+    getHoldZoomShortcutStatus,
+    getQuickAccessShortcutStatus
+  } from "../lib/services/ipc/shortcuts.js";
   import { errorMessage } from "../lib/services/ipc/settings.js";
   import { notifyApp } from "../lib/services/notifications.js";
   import { captureScreenshot } from "../lib/services/ipc/screenshot.js";
@@ -32,7 +37,13 @@
   } from "../lib/types/recording.js";
   import type { SettingsPatch } from "../lib/types/settings.js";
   import type { SettingsTab } from "../lib/types/settings-view.js";
-  import type { HoldZoomShortcutStatus, QuickAccessShortcutStatus } from "../lib/types/shortcuts.js";
+  import type {
+    CaptureHotkeyAction,
+    CaptureHotkeyRequest,
+    CaptureHotkeyStatus,
+    HoldZoomShortcutStatus,
+    QuickAccessShortcutStatus
+  } from "../lib/types/shortcuts.js";
 
   type CaptureMode = "record" | "screenshot";
   type Quality = "720p" | "1080p" | "2160p";
@@ -51,9 +62,11 @@
   let saveToFile = $state(true);
   let settingsOpen = $state(false);
   let aboutOpen = $state(false);
+  let updateOpen = $state(false);
   let settingsTab = $state<SettingsTab>("snap");
   let startupLabel = $state("Start with system");
   let shortcutStatus = $state<QuickAccessShortcutStatus | null>(null);
+  let captureHotkeyStatus = $state<CaptureHotkeyStatus[] | null>(null);
   let holdZoomStatus = $state<HoldZoomShortcutStatus | null>(null);
   let shortcutError = $state<string | null>(null);
   let settingsFormLoaded = $state(false);
@@ -66,6 +79,10 @@
   let preflightReport = $state<RecordingPreflightReport | null>(null);
   let preflightRequestId = 0;
   let selectedCaptureTarget = $state<CaptureTarget | null>(null);
+  let hotkeyCaptureRequest = $state<CaptureHotkeyRequest | null>(null);
+  let pendingCaptureHotkey: CaptureHotkeyRequest | null = null;
+  let queuedCaptureHotkey: CaptureHotkeyAction | null = null;
+  let hotkeyRequestId = 0;
   let formRevision = 0;
   let lastFormSignature = "";
   let lastNotifiedSessionRevision = -1;
@@ -73,6 +90,8 @@
   let lastNotifiedRecordingError: string | null = null;
 
   function openSettings() {
+    updateOpen = false;
+    aboutOpen = false;
     settingsOpen = true;
     shortcutError = null;
     startupLabel = systemStartupLabel();
@@ -80,9 +99,18 @@
     void getQuickAccessShortcutStatus()
       .then((status) => (shortcutStatus = status))
       .catch((error: unknown) => (shortcutError = errorMessage(error)));
+    void getCaptureHotkeyStatus()
+      .then((status) => (captureHotkeyStatus = status))
+      .catch((error: unknown) => console.error(`[RecoDex] Capture hotkey status unavailable: ${errorMessage(error)}`));
     void getHoldZoomShortcutStatus()
       .then((status) => (holdZoomStatus = status))
       .catch((error: unknown) => console.error(`[RecoDex] Hold-to-zoom status unavailable: ${errorMessage(error)}`));
+  }
+
+  function openUpdate() {
+    settingsOpen = false;
+    aboutOpen = false;
+    updateOpen = true;
   }
 
   function systemStartupLabel(): string {
@@ -218,6 +246,81 @@
     }
   }
 
+  function beginHotkeyCapture(action: CaptureHotkeyAction) {
+    if (pendingCaptureHotkey || queuedCaptureHotkey) {
+      notifyUser("Capture shortcut unavailable", "Finish or cancel the current source selection first.");
+      return;
+    }
+    if (sessionActive || actionPending) {
+      notifyUser("Capture shortcut unavailable", "Finish the current capture before starting another one.");
+      return;
+    }
+    if (!settingsFormLoaded || !preferences.settings) {
+      queuedCaptureHotkey = action;
+      return;
+    }
+
+    settingsOpen = false;
+    aboutOpen = false;
+    mode = action.startsWith("record-") ? "record" : "screenshot";
+    target = action.endsWith("-window") ? "window" : action.endsWith("-region") ? "region" : "screen";
+    const request = { id: ++hotkeyRequestId, action };
+    pendingCaptureHotkey = request;
+    hotkeyCaptureRequest = request;
+  }
+
+  function completeHotkeyCapture(requestId: number) {
+    if (pendingCaptureHotkey?.id !== requestId) return;
+    const { action } = pendingCaptureHotkey;
+    pendingCaptureHotkey = null;
+    hotkeyCaptureRequest = null;
+    void runHotkeyCapture(action);
+  }
+
+  function cancelHotkeyCapture(requestId: number) {
+    if (pendingCaptureHotkey?.id !== requestId) return;
+    pendingCaptureHotkey = null;
+    hotkeyCaptureRequest = null;
+  }
+
+  async function runHotkeyCapture(action: CaptureHotkeyAction) {
+    await tick();
+    if (!capabilities) {
+      try {
+        const [nextCapabilities, nextPermissions] = await Promise.all([
+          getCaptureCapabilities(),
+          getCapturePermissions()
+        ]);
+        capabilities = nextCapabilities;
+        permissions = nextPermissions;
+      } catch (error) {
+        notifyUser("Capture failed", errorMessage(error));
+        return;
+      }
+    }
+    await tick();
+    if (action.startsWith("record-")) {
+      if (!canStartRecording) {
+        notifyUser("Recording unavailable", captureMessage);
+        return;
+      }
+      await startCapture();
+      return;
+    }
+    if (!canTakeScreenshot) {
+      notifyUser("Screenshot unavailable", captureMessage);
+      return;
+    }
+    await takeScreenshot();
+  }
+
+  function isCaptureHotkeyAction(value: string): value is CaptureHotkeyAction {
+    return [
+      "record-screen", "record-window", "record-region",
+      "screenshot-screen", "screenshot-window", "screenshot-region"
+    ].includes(value);
+  }
+
   function screenshotNotice(result: {
     width: number;
     height: number;
@@ -294,17 +397,32 @@
     let disposed = false;
     let unlisten: (() => void) | undefined;
     let unlistenWebcamWarning: (() => void) | undefined;
+    let unlistenCaptureHotkey: (() => void) | undefined;
 
     void preferences.initialize().then(() => {
       if (!disposed && preferences.settings) {
         setFormFromSettings(preferences.settings);
         settingsFormLoaded = true;
+        const queued = queuedCaptureHotkey;
+        queuedCaptureHotkey = null;
+        if (queued) beginHotkeyCapture(queued);
+      } else if (!disposed && queuedCaptureHotkey) {
+        queuedCaptureHotkey = null;
+        notifyUser("Capture shortcut unavailable", preferences.error ?? "RecoDex settings are not ready yet.");
       }
     });
     void recordingSession.connect().then((stopWatching) => {
         if (disposed) stopWatching();
         else unlisten = stopWatching;
       });
+    if (preferences.desktopApp) {
+      void listen<string>("capture://hotkey", ({ payload }) => {
+        if (isCaptureHotkeyAction(payload)) beginHotkeyCapture(payload);
+      }).then((stopListening) => {
+        if (disposed) stopListening();
+        else unlistenCaptureHotkey = stopListening;
+      }).catch((error: unknown) => console.error(`[RecoDex] Capture hotkey listener unavailable: ${errorMessage(error)}`));
+    }
     if (preferences.desktopApp) {
       void listen<string>("webcam://recording-warning", ({ payload }) => {
         notifyUser("Webcam overlay", payload);
@@ -331,6 +449,7 @@
       disposed = true;
       unlisten?.();
       unlistenWebcamWarning?.();
+      unlistenCaptureHotkey?.();
     };
   });
 
@@ -400,25 +519,30 @@
   class:session-active={sessionActive}
   class:settings-open={settingsOpen}
   class:about-open={aboutOpen}
+  class:update-open={updateOpen}
   data-tauri-drag-region="false"
   aria-labelledby="main-title"
 >
   <WindowTitleBar
     desktopApp={preferences.desktopApp}
-    settingsActive={settingsOpen || aboutOpen}
+    settingsActive={settingsOpen || aboutOpen || updateOpen}
     minimizeToTray={preferences.settings?.minimizeToTray ?? true}
     settingsDisabled={!preferences.desktopApp || !preferences.settings}
     settingsTitle={preferences.error ?? "Recording and screenshot preferences."}
     onSettings={openSettings}
     onAbout={() => (aboutOpen = true)}
+    onUpdate={openUpdate}
     onBack={() => {
       settingsOpen = false;
       aboutOpen = false;
+      updateOpen = false;
     }}
     onWindowError={(message) => console.error(`[RecoDex] Window control error: ${message}`)}
   />
 
-  {#if aboutOpen}
+  {#if updateOpen}
+    <UpdateView />
+  {:else if aboutOpen}
     <AboutView />
   {:else if settingsOpen}
     <SettingsView
@@ -427,6 +551,7 @@
       saving={preferences.pendingWrites > 0}
       error={preferences.error}
       {shortcutStatus}
+      {captureHotkeyStatus}
       {shortcutError}
       {startupLabel}
       startupSupported={preferences.autoStartAvailable}
@@ -457,12 +582,15 @@
 
     <CaptureTargetPicker
       value={target}
+      hotkeyRequest={hotkeyCaptureRequest}
       onSelect={(next) => (target = next)}
       desktopApp={preferences.desktopApp}
       onTargetChange={(next) => {
         selectedCaptureTarget = next;
         invalidateRecordingCheck();
       }}
+      onHotkeyTargetSelected={completeHotkeyCapture}
+      onHotkeyRequestCancelled={cancelHotkeyCapture}
     />
 
     {#if mode === "record"}

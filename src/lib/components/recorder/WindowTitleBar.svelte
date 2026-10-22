@@ -20,6 +20,7 @@
     settingsTitle,
     onSettings,
     onAbout,
+    onUpdate,
     onBack = () => {},
     onWindowError
   }: {
@@ -30,6 +31,7 @@
     settingsTitle: string;
     onSettings: () => void;
     onAbout: () => void;
+    onUpdate: () => void;
     onBack?: () => void;
     onWindowError: (message: string) => void;
   } = $props();
@@ -65,7 +67,7 @@
     <h1 id="main-title">RecoDex</h1>
   </div>
   <div class="titlebar-actions">
-    <AppUpdateButton desktopApp visible={!settingsActive} />
+    <AppUpdateButton desktopApp visible={!settingsActive} onOpen={onUpdate} />
     {#if !settingsActive}
     <Button
       variant="ghost"

@@ -26,6 +26,25 @@ pub fn get_quick_access_shortcut_status(
 }
 
 #[tauri::command]
+pub fn get_capture_hotkey_status(
+    window: WebviewWindow,
+    state: State<'_, AppState>,
+) -> Result<Vec<crate::shortcut::CaptureHotkeyStatus>, IpcError> {
+    if window.label() != "main" {
+        return Err(IpcError::new(
+            "window_not_authorized",
+            "Shortcut status may only be read from the main window.",
+            false,
+        ));
+    }
+    state
+        .capture_hotkeys
+        .lock()
+        .map(|status| status.clone())
+        .map_err(|_| IpcError::internal("Capture hotkey status is unavailable."))
+}
+
+#[tauri::command]
 pub fn get_hold_zoom_shortcut_status(
     window: WebviewWindow,
     state: State<'_, AppState>,

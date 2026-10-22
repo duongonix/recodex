@@ -10,21 +10,29 @@
   } from "../../services/ipc/capture.js";
   import type { CaptureTarget } from "../../types/recording.js";
   import type { DisplaySource, WindowSource } from "../../types/capture.js";
+  import type { CaptureHotkeyAction, CaptureHotkeyRequest } from "../../types/shortcuts.js";
 
   export type CaptureTargetChoice = "screen" | "window" | "region";
 
   const REGION_SELECTED_EVENT = "capture://region-selected";
+  const REGION_CANCELLED_EVENT = "capture://region-picker-cancelled";
 
   let {
     value,
     desktopApp,
+    hotkeyRequest = null,
     onSelect,
-    onTargetChange
+    onTargetChange,
+    onHotkeyTargetSelected,
+    onHotkeyRequestCancelled
   }: {
     value: CaptureTargetChoice;
     desktopApp: boolean;
+    hotkeyRequest?: CaptureHotkeyRequest | null;
     onSelect: (target: CaptureTargetChoice) => void;
     onTargetChange: (target: CaptureTarget | null) => void;
+    onHotkeyTargetSelected: (requestId: number) => void;
+    onHotkeyRequestCancelled: (requestId: number) => void;
   } = $props();
 
   let displays = $state<DisplaySource[]>([]);
@@ -40,6 +48,7 @@
   let previousPickerChoice = $state<CaptureTargetChoice>("screen");
   let previousPickerError = $state<string | null>(null);
   let sourceError = $state<string | null>(null);
+  let handledHotkeyRequestId = 0;
 
   $effect(() => {
     if (!desktopApp) return;
@@ -52,6 +61,7 @@
       regionSize = { width: payload.width, height: payload.height };
       sourceError = null;
       onTargetChange(payload);
+      completeHotkeyRequest("region");
     }).then((stop) => {
       if (disposed) stop();
       else unlisteners.push(stop);
@@ -73,11 +83,22 @@
       windowPickerPending = false;
       onSelect(previousPickerChoice);
       sourceError = previousPickerError;
+      cancelHotkeyRequest("window");
     }).then((stop) => {
       if (disposed) stop();
       else unlisteners.push(stop);
     }).catch((error: unknown) => {
       if (!disposed) sourceError = `Could not listen for the window picker: ${formatCaptureError(error)}`;
+    });
+
+    void listen(REGION_CANCELLED_EVENT, () => {
+      regionPickerPending = false;
+      cancelHotkeyRequest("region");
+    }).then((stop) => {
+      if (disposed) stop();
+      else unlisteners.push(stop);
+    }).catch((error: unknown) => {
+      if (!disposed) sourceError = `Could not listen for region-picker cancellation: ${formatCaptureError(error)}`;
     });
 
     void listDisplays().then((sources) => {
@@ -103,6 +124,18 @@
       if (display && (selectedTarget?.kind !== "display" || selectedTarget.displayId !== display.displayId)) {
         setDisplayTarget(display);
       }
+    }
+  });
+
+  $effect(() => {
+    const request = hotkeyRequest;
+    if (!desktopApp || !request || request.id === handledHotkeyRequestId) return;
+    handledHotkeyRequestId = request.id;
+    sourceError = null;
+    switch (targetForHotkeyAction(request.action)) {
+      case "screen": void chooseScreen(); break;
+      case "window": void chooseWindow(); break;
+      case "region": void chooseRegion(); break;
     }
   });
 
@@ -143,6 +176,7 @@
     } catch (error) {
       onTargetChange(null);
       sourceError = formatCaptureError(error);
+      cancelHotkeyRequest("screen");
       return;
     }
     const current = displays.find((display) => display.displayId === selectedDisplayId);
@@ -150,6 +184,7 @@
     if (!display) {
       onTargetChange(null);
       sourceError = "No displays are currently available.";
+      cancelHotkeyRequest("screen");
       return;
     }
     selectedDisplayId = display.displayId;
@@ -160,6 +195,7 @@
       return;
     }
     setDisplayTarget(display);
+    completeHotkeyRequest("screen");
   }
 
   async function chooseWindow() {
@@ -175,6 +211,7 @@
       windowPickerPending = false;
       onSelect(previousPickerChoice);
       sourceError = `Could not open the window picker: ${formatCaptureError(error)}`;
+      cancelHotkeyRequest("window");
     }
   }
 
@@ -197,6 +234,7 @@
       await openRegionPicker(display.displayId);
     } catch (error) {
       sourceError = `Could not open the region picker: ${formatCaptureError(error)}`;
+      cancelHotkeyRequest("region");
     } finally {
       regionPickerPending = false;
     }
@@ -213,6 +251,7 @@
   function selectDisplay(display: DisplaySource) {
     setDisplayTarget(display);
     pickerOpen = false;
+    completeHotkeyRequest("screen");
   }
 
   function applyWindowSelection(source: WindowSource) {
@@ -223,10 +262,30 @@
     sourceError = null;
     onTargetChange(target);
     onSelect("window");
+    completeHotkeyRequest("window");
   }
 
   function closePicker() {
     pickerOpen = false;
+    cancelHotkeyRequest("screen");
+  }
+
+  function completeHotkeyRequest(targetKind: CaptureTargetChoice) {
+    if (hotkeyRequest && targetForHotkeyAction(hotkeyRequest.action) === targetKind) {
+      onHotkeyTargetSelected(hotkeyRequest.id);
+    }
+  }
+
+  function cancelHotkeyRequest(targetKind: CaptureTargetChoice) {
+    if (hotkeyRequest && targetForHotkeyAction(hotkeyRequest.action) === targetKind) {
+      onHotkeyRequestCancelled(hotkeyRequest.id);
+    }
+  }
+
+  function targetForHotkeyAction(action: CaptureHotkeyAction): CaptureTargetChoice {
+    if (action.endsWith("-window")) return "window";
+    if (action.endsWith("-region")) return "region";
+    return "screen";
   }
 
 </script>
