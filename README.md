@@ -51,7 +51,7 @@ Các tính năng trên đã có phần triển khai trong codebase, nhưng một
 |---|---|
 | Windows x64 | Nền tảng phát triển chính; capture và encoding native đang được triển khai, một số luồng cần kiểm thử runtime bổ sung. |
 | Windows ARM64 | Đã có trong ma trận workflow phát hành; chưa xác nhận qua một lần phát hành hoàn chỉnh. |
-| macOS Intel / Apple Silicon | Đã cấu hình làm mục tiêu đóng gói; capture adapter chưa được triển khai. |
+| macOS Intel / Apple Silicon | Đã cấu hình gói DMG; workflow hiện chưa phát hành updater archive có chữ ký. Capture adapter chưa được triển khai. |
 | Linux x64 / ARM64 | Đã cấu hình làm mục tiêu đóng gói; capture adapter chưa được triển khai. |
 
 Các gói do GitHub Actions tạo ra cần được xem là **artifact thử nghiệm cho đến khi từng target được build và kiểm thử thực tế**. Capture trên macOS/Linux hiện chưa được hỗ trợ.
@@ -113,7 +113,7 @@ Ma trận hiện tại:
 | macOS | Intel x64, Apple Silicon ARM64 | DMG |
 | Linux | x64, ARM64 | AppImage, DEB, RPM |
 
-Workflow yêu cầu repository secret `TAURI_SIGNING_PRIVATE_KEY`; nếu private key có password thì cần thêm `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Không commit private key vào repository. Workflow tạo draft release và chỉ publish sau khi toàn bộ sáu build target thành công. Cấu hình updater và giới hạn nền tảng được mô tả trong [tài liệu phát hành](specs/updates/01-github-releases.md).
+Workflow yêu cầu repository secret `TAURI_SIGNING_PRIVATE_KEY`; nếu private key có password thì cần thêm `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Không commit private key vào repository. Sáu target được build và tải bundle/chữ ký lên draft song song; sau khi tất cả thành công, một job tạo `latest.json` từ các chữ ký Windows/Linux rồi publish release. macOS hiện phát hành DMG nhưng chưa có updater archive có chữ ký. Cấu hình updater và giới hạn nền tảng được mô tả trong [tài liệu phát hành](specs/updates/01-github-releases.md).
 
 ## Kiến trúc dự án
 

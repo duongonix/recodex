@@ -81,18 +81,63 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+  prepare_release:
+    name: Prepare draft release
+    needs: quality
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    outputs:
+      release_id: ${{ steps.prepare.outputs.release_id }}
+    steps:
+      - name: Create or reuse the draft release
+        id: prepare
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = context.ref_name;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const existing = releases.find((release) => release.tag_name === tag);
+
+            if (existing) {
+              if (!existing.draft) {
+                throw new Error(`Release ${tag} already exists and is published.`);
+              }
+              core.setOutput('release_id', existing.id);
+              core.info(`Reusing draft release ${existing.id} for ${tag}.`);
+            } else {
+              const created = await github.rest.repos.createRelease({
+                owner,
+                repo,
+                tag_name: tag,
+                target_commitish: context.sha,
+                name: `RecoDex ${tag}`,
+                body: 'Install the package matching your operating system and processor. Windows uses the NSIS installer; Linux AppImage users receive in-app updates, while DEB/RPM users update through their package manager.',
+                draft: true,
+                prerelease: false,
+                generate_release_notes: true,
+              });
+              core.setOutput('release_id', created.data.id);
+              core.info(`Created draft release ${created.data.id} for ${tag}.`);
+            }
+
   build-and-upload:
     name: Build ${{ matrix.name }}
-    needs: quality
+    needs: [quality, prepare_release]
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 90
     permissions:
       contents: write
     strategy:
       fail-fast: false
-      # tauri-action updates latest.json for each target. Serial uploads avoid
-      # races while the action replaces that shared release asset.
-      max-parallel: 1
+      # Build and upload unique per-target assets concurrently. The updater
+      # manifest is generated once in publish-release after every target passes.
+      max-parallel: 6
       matrix:
         include:
           - name: Windows x64
@@ -184,13 +229,15 @@ jobs:
         with:
           owner: duongonix
           repo: recodex
+          releaseId: ${{ needs.prepare_release.outputs.release_id }}
           tagName: ${{ github.ref_name }}
           releaseName: RecoDex ${{ github.ref_name }}
           releaseBody: "Install the package matching your operating system and processor. Windows uses the NSIS installer; Linux AppImage users receive in-app updates, while DEB/RPM users update through their package manager."
           generateReleaseNotes: true
           releaseDraft: true
           prerelease: false
-          uploadUpdaterJson: true
+          # Concurrent matrix jobs must not replace the same latest.json asset.
+          uploadUpdaterJson: false
           updaterJsonPreferNsis: true
           retryAttempts: 2
           args: --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
@@ -202,19 +249,129 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Publish the draft after all six builds succeed
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ github.ref_name }}
-          REPOSITORY: ${{ github.repository }}
-        shell: bash
-        run: |
-          # Draft releases are omitted by the tag lookup endpoint, so find it in the release list.
-          release_id="$(gh api "repos/${REPOSITORY}/releases?per_page=100" | jq -r --arg tag "$RELEASE_TAG" '[.[] | select(.tag_name == $tag)][0].id // empty')"
-          if [[ -z "$release_id" || "$release_id" == "null" ]]; then
-            echo "Could not find the draft release for ${RELEASE_TAG}."
-            exit 1
-          fi
+      - name: Generate signed updater manifest and publish release
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const { owner, repo } = context.repo;
+            const tag = context.ref_name;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((candidate) => candidate.tag_name === tag);
+            if (!release || !release.draft) {
+              throw new Error(`Could not find a draft release for ${tag}.`);
+            }
 
-          gh api --method PATCH "repos/${REPOSITORY}/releases/${release_id}" -F draft=false
-          echo "Published ${REPOSITORY} release ${RELEASE_TAG}."
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner,
+              repo,
+              release_id: release.id,
+              per_page: 100,
+            });
+            const assetsByName = new Map(assets.map((asset) => [asset.name, asset]));
+            const platforms = {};
+
+            function platformForSignature(name) {
+              let match = name.match(/_(x64|amd64|x86_64)-setup\.exe\.sig$/i);
+              if (match) return { os: 'windows', arch: 'x86_64', bundle: 'nsis', primary: true };
+              match = name.match(/_(arm64|aarch64)-setup\.exe\.sig$/i);
+              if (match) return { os: 'windows', arch: 'aarch64', bundle: 'nsis', primary: true };
+
+              match = name.match(/_(amd64|x86_64|x64)\.AppImage\.sig$/i);
+              if (match) return { os: 'linux', arch: 'x86_64', bundle: 'appimage', primary: true };
+              match = name.match(/_(arm64|aarch64)\.AppImage\.sig$/i);
+              if (match) return { os: 'linux', arch: 'aarch64', bundle: 'appimage', primary: true };
+
+              match = name.match(/_(amd64|x86_64|x64)\.deb\.sig$/i);
+              if (match) return { os: 'linux', arch: 'x86_64', bundle: 'deb', primary: false };
+              match = name.match(/_(arm64|aarch64)\.deb\.sig$/i);
+              if (match) return { os: 'linux', arch: 'aarch64', bundle: 'deb', primary: false };
+              match = name.match(/\.(x86_64|amd64)\.rpm\.sig$/i);
+              if (match) return { os: 'linux', arch: 'x86_64', bundle: 'rpm', primary: false };
+              match = name.match(/\.(aarch64|arm64)\.rpm\.sig$/i);
+              if (match) return { os: 'linux', arch: 'aarch64', bundle: 'rpm', primary: false };
+
+              return null;
+            }
+
+            const signatures = assets.filter((asset) => asset.name.endsWith('.sig'));
+            for (const signatureAsset of signatures) {
+              const target = platformForSignature(signatureAsset.name);
+              if (!target) continue;
+
+              const bundleName = signatureAsset.name.slice(0, -'.sig'.length);
+              const bundleAsset = assetsByName.get(bundleName);
+              if (!bundleAsset) {
+                throw new Error(`Missing signed updater bundle ${bundleName}.`);
+              }
+
+              const response = await github.request(
+                'GET /repos/{owner}/{repo}/releases/assets/{asset_id}',
+                {
+                  owner,
+                  repo,
+                  asset_id: signatureAsset.id,
+                  headers: { accept: 'application/octet-stream' },
+                },
+              );
+              const signature = Buffer.from(response.data).toString('utf8');
+              if (!signature.trim()) {
+                throw new Error(`Updater signature ${signatureAsset.name} is empty.`);
+              }
+
+              const entry = {
+                signature,
+                url: `https://api.github.com/repos/${owner}/${repo}/releases/assets/${bundleAsset.id}`,
+              };
+              platforms[`${target.os}-${target.arch}-${target.bundle}`] = entry;
+              if (target.primary) platforms[`${target.os}-${target.arch}`] = entry;
+            }
+
+            const requiredPlatforms = [
+              'windows-x86_64',
+              'windows-aarch64',
+              'linux-x86_64',
+              'linux-aarch64',
+            ];
+            const missing = requiredPlatforms.filter((key) => !platforms[key]);
+            if (missing.length) {
+              throw new Error(`Missing signed updater targets: ${missing.join(', ')}.`);
+            }
+
+            const manifest = Buffer.from(JSON.stringify({
+              version: tag.replace(/^v/, ''),
+              notes: release.body ?? '',
+              pub_date: new Date().toISOString(),
+              platforms,
+            }, null, 2));
+
+            const existingManifest = assetsByName.get('latest.json');
+            if (existingManifest) {
+              await github.rest.repos.deleteReleaseAsset({
+                owner,
+                repo,
+                asset_id: existingManifest.id,
+              });
+            }
+            await github.rest.repos.uploadReleaseAsset({
+              owner,
+              repo,
+              release_id: release.id,
+              name: 'latest.json',
+              data: manifest,
+              headers: {
+                'content-type': 'application/json',
+                'content-length': manifest.length,
+              },
+            });
+
+            await github.rest.repos.updateRelease({
+              owner,
+              repo,
+              release_id: release.id,
+              draft: false,
+            });
+            core.info(`Published ${owner}/${repo} ${tag} with ${Object.keys(platforms).length} updater entries.`);

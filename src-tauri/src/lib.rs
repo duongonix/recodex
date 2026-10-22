@@ -3,6 +3,8 @@ use tauri::Manager;
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
+        // Register command state before setup so every webview sees it as soon as it can invoke IPC.
+        .manage(app_state::AppState::new())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -41,7 +43,10 @@ pub fn run() {
                 video_dir,
                 screenshot_dir,
             )?;
-            app.manage(app_state::AppState::new(settings));
+            app.state::<app_state::AppState>()
+                .settings
+                .initialize(settings)
+                .map_err(|error| std::io::Error::other(error.message))?;
             shortcut::register_quick_access(app.handle());
             shortcut::register_hold_zoom_shortcut(app.handle());
             system_tray::install(app)?;

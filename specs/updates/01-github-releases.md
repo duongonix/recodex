@@ -17,7 +17,7 @@ The release workflow is `.github/workflows/release.yml`. Before the first tagged
 1. Add a repository Actions secret named `TAURI_SIGNING_PRIVATE_KEY` containing the private key file's contents.
 2. Keep the private key out of commits, artifacts, logs, and release assets. Do not replace it after users install a signed release; replacing it requires a new app installation for users to trust a different key.
 3. The workflow uses `GITHUB_TOKEN` with `contents: write` to upload bundles and update the release manifest; no separately created GitHub token is needed.
-4. Keep the generated public key in `src-tauri/tauri.conf.json` paired with the private key secret. The workflow publishes the release only after all six matrix targets succeed.
+4. Keep the generated public key in `src-tauri/tauri.conf.json` paired with the private key secret. The workflow builds all six targets in parallel, then publishes only after the signed updater manifest has been generated and every build has succeeded.
 
 The current generated key has no password. If it is later replaced with a password-protected key, configure `TAURI_SIGNING_PRIVATE_KEY_PASSWORD` as a separate Actions secret.
 
@@ -29,12 +29,12 @@ Push a version tag such as `v0.1.0` to `duongonix/recodex` after setting the sam
 |---|---|---|---|
 | Windows | x64 | NSIS installer | Yes |
 | Windows | ARM64 | NSIS installer | Yes |
-| macOS | Intel x64 | DMG + signed updater archive | Yes |
-| macOS | Apple Silicon ARM64 | DMG + signed updater archive | Yes |
+| macOS | Intel x64 | DMG | No updater archive is currently emitted |
+| macOS | Apple Silicon ARM64 | DMG | No updater archive is currently emitted |
 | Linux | x64 | AppImage, DEB, RPM | AppImage |
 | Linux | ARM64 | AppImage, DEB, RPM | AppImage |
 
-The builds use native GitHub-hosted runners for each target. Linux ARM AppImage packaging is the least-tested matrix entry; Tauri documents a slower QEMU-based build path for Linux ARM AppImages if the native runner's bundler tooling cannot build it. Release automation has not yet run against GitHub, so the six artifacts, updater manifest, and update installation remain unverified until a tagged release succeeds.
+The builds use native GitHub-hosted runners for each target and run concurrently. Per-target `tauri-action` jobs upload only their uniquely named bundles and signatures; one final job combines updater signatures into `latest.json`, avoiding concurrent delete/re-upload races on that shared asset. Windows NSIS and Linux AppImage entries are required before publishing. Linux ARM AppImage packaging is the least-tested matrix entry; Tauri documents a slower QEMU-based build path for Linux ARM AppImages if the native runner's bundler tooling cannot build it. Release artifacts, updater installation, and all non-Windows packages still require platform smoke tests.
 
 Windows releases use NSIS as the updater installer format. macOS builds use ad-hoc signing when no Apple Developer certificate is configured; this is not notarization. Windows binaries are not Authenticode-signed unless a code-signing setup is added. macOS/Linux capture adapters are still not implemented in the app, so producing installers does not mean those capture flows are supported.
 

@@ -1,8 +1,50 @@
-use std::sync::{Arc, Mutex, atomic::AtomicBool, mpsc::SyncSender};
+use std::sync::{Arc, Mutex, OnceLock, atomic::AtomicBool, mpsc::SyncSender};
 
 use crate::{
-    capture::region::RegionPickerState, recording::RecordingSession, settings::SettingsService,
+    capture::region::RegionPickerState,
+    errors::IpcError,
+    recording::RecordingSession,
+    settings::{AppSettings, SettingsPatch, SettingsService},
 };
+
+#[derive(Default)]
+pub struct SettingsServiceState {
+    service: OnceLock<SettingsService>,
+}
+
+impl SettingsServiceState {
+    pub fn initialize(&self, service: SettingsService) -> Result<(), IpcError> {
+        self.service.set(service).map_err(|_| {
+            IpcError::internal("Application settings were initialized more than once.")
+        })
+    }
+
+    pub fn get(&self) -> Result<AppSettings, IpcError> {
+        self.service
+            .get()
+            .ok_or_else(|| {
+                IpcError::new(
+                    "settings_initializing",
+                    "Application settings are still initializing. Please retry shortly.",
+                    true,
+                )
+            })?
+            .get()
+    }
+
+    pub fn update(&self, patch: SettingsPatch) -> Result<AppSettings, IpcError> {
+        self.service
+            .get()
+            .ok_or_else(|| {
+                IpcError::new(
+                    "settings_initializing",
+                    "Application settings are still initializing. Please retry shortly.",
+                    true,
+                )
+            })?
+            .update(patch)
+    }
+}
 
 pub struct AppState {
     pub recording: Arc<Mutex<RecordingSession>>,
@@ -10,7 +52,7 @@ pub struct AppState {
     pub recording_review: crate::recording::review::RecordingReviewStore,
     pub recording_control: Mutex<Option<SyncSender<crate::recording::runtime::WorkerCommand>>>,
     pub toolbar_last_position: Mutex<Option<(i32, i32)>>,
-    pub settings: SettingsService,
+    pub settings: SettingsServiceState,
     pub screenshot_editor_sessions: crate::editor::EditorSessionStore,
     pub region_picker: Mutex<Option<RegionPickerState>>,
     pub window_selection: Mutex<crate::capture::window_selection::WindowSelectionState>,
@@ -24,14 +66,14 @@ pub struct AppState {
 }
 
 impl AppState {
-    pub fn new(settings: SettingsService) -> Self {
+    pub fn new() -> Self {
         Self {
             recording: Arc::new(Mutex::new(RecordingSession::default())),
             #[cfg(windows)]
             recording_review: crate::recording::review::RecordingReviewStore::default(),
             recording_control: Mutex::new(None),
             toolbar_last_position: Mutex::new(None),
-            settings,
+            settings: SettingsServiceState::default(),
             screenshot_editor_sessions: crate::editor::EditorSessionStore::default(),
             region_picker: Mutex::new(None),
             window_selection: Mutex::new(

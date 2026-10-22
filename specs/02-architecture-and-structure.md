@@ -12,6 +12,8 @@ Tauri 2 + Rust backend, Svelte 5 runes, TypeScript, Tailwind CSS 4, shadcn-svelt
 4. Capture backends provide OS-specific video/audio acquisition.
 5. Media pipeline timestamps/synchronizes audio-video, encodes and muxes outputs. Use native media APIs and/or an FFmpeg-based integration with documented distribution/licensing.
 
+`AppState` is registered on the Tauri builder before setup. Settings storage is initialized during setup after Tauri resolves the platform configuration/output directories; settings IPC returns a recoverable `settings_initializing` error during that short interval, and the frontend retries initial settings reads.
+
 ## Hold-to-zoom processing path
 
 - Settings persist `zoomOnHoldEnabled` and `zoomOnHoldShortcut`; the main-window settings UI captures the chosen key combination and the Tauri global-shortcut plugin supplies native pressed/released events.
