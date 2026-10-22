@@ -93,10 +93,12 @@ jobs:
       - name: Create or reuse the draft release
         id: prepare
         uses: actions/github-script@v9
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         with:
           script: |
             const { owner, repo } = context.repo;
-            const tag = context.ref_name;
+            const tag = process.env.RELEASE_TAG;
             const releases = await github.paginate(github.rest.repos.listReleases, {
               owner,
               repo,
@@ -251,10 +253,12 @@ jobs:
     steps:
       - name: Generate signed updater manifest and publish release
         uses: actions/github-script@v9
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
         with:
           script: |
             const { owner, repo } = context.repo;
-            const tag = context.ref_name;
+            const tag = process.env.RELEASE_TAG;
             const releases = await github.paginate(github.rest.repos.listReleases, {
               owner,
               repo,
