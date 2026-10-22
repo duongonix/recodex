@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { untrack } from "svelte";
   import Download from "@lucide/svelte/icons/download";
   import { Button } from "../ui/button/index.js";
   import { appUpdate } from "../../stores/app-update.svelte.js";
@@ -13,7 +14,10 @@
     onOpen: () => void;
   } = $props();
 
-  $effect(() => appUpdate.start(desktopApp));
+  $effect(() => {
+    const enabled = desktopApp;
+    return untrack(() => appUpdate.start(enabled));
+  });
 </script>
 
 {#if visible && appUpdate.updateAvailable}

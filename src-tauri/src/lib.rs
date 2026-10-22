@@ -2,9 +2,15 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    let context = tauri::generate_context!();
+    webview_profile::prepare(&context.config().identifier)
+        .expect("Failed to initialize the WebView2 user data folder");
+
+    let builder = tauri::Builder::default()
         // Register command state before setup so every webview sees it as soon as it can invoke IPC.
-        .manage(app_state::AppState::new())
+        .manage(app_state::AppState::new());
+
+    builder
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
@@ -106,7 +112,7 @@ pub fn run() {
             commands::shortcuts::get_capture_hotkey_status,
             commands::shortcuts::get_hold_zoom_shortcut_status
         ])
-        .run(tauri::generate_context!())
+        .run(context)
         .expect("error while running tauri application");
 }
 
@@ -122,3 +128,4 @@ pub mod settings;
 mod shortcut;
 mod system_tray;
 pub mod webcam;
+mod webview_profile;
