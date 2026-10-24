@@ -1,6 +1,13 @@
-# RecoDex
+# RecoDex: 
 
-RecoDex giúp bạn quay lại những gì đang diễn ra trên màn hình và chụp ảnh desktop nhanh chóng. Chọn màn hình, cửa sổ hoặc một vùng cụ thể, bật âm thanh cần thiết rồi bắt đầu ghi. Giao diện tối gọn với điểm nhấn đỏ, các điều khiển chính luôn dễ tìm trong lúc sử dụng.
+### Ứng dụng desktop để quay màn hình, chụp ảnh và xem lại bản ghi.
+
+**Chọn màn hình, cửa sổ hoặc vùng cần ghi; thêm âm thanh và webcam; rồi xem lại, chỉnh sửa và xuất video ngay trong RecoDex.**
+
+[![Latest release](https://img.shields.io/github/v/release/duongonix/recodex?style=flat-square&color=cb3837)](https://github.com/duongonix/recodex/releases/latest)
+[![Release build](https://img.shields.io/github/actions/workflow/status/duongonix/recodex/release.yml?style=flat-square&label=release%20build)](https://github.com/duongonix/recodex/actions/workflows/release.yml)
+[![Windows capture](https://img.shields.io/badge/Windows-capture%20supported-0078D6?style=flat-square&logo=windows)](https://github.com/duongonix/recodex/releases/latest)
+[![MIT License](https://img.shields.io/github/license/duongonix/recodex?style=flat-square&color=cb3837)](https://github.com/duongonix/recodex/blob/main/LICENSE)
 
 ![Giao diện RecoDex](static/recodex-preview.png)
 
