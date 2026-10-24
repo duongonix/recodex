@@ -57,6 +57,12 @@ Các phím tắt được đăng ký khi ứng dụng mở. Nếu tổ hợp đa
 - Dùng timeline để chia clip, cắt đầu/cuối, xóa đoạn đã chọn và hoàn tác hoặc làm lại thao tác.
 - Xuất video đã chỉnh sửa thành tệp MP4 mà không thay đổi bản ghi gốc.
 
+### Thư viện bản ghi
+
+- Xem lại các video và ảnh chụp đã lưu trong cùng một danh sách.
+- Lọc theo loại nội dung, tìm kiếm theo tên tệp, mở tệp bằng ứng dụng mặc định hoặc mở thư mục chứa tệp.
+- Ảnh xem trước được tạo từ nội dung đã lưu; các tệp hiện có trong thư mục đầu ra cũng được hiển thị.
+
 ### Cài đặt và cập nhật
 
 - Chọn thư mục lưu video và ảnh chụp.

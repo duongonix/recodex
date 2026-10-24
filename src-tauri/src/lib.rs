@@ -53,6 +53,10 @@ pub fn run() {
                 .settings
                 .initialize(settings)
                 .map_err(|error| std::io::Error::other(error.message))?;
+            app.state::<app_state::AppState>()
+                .capture_library
+                .initialize(config_dir.join("capture-library.json"))
+                .map_err(|error| std::io::Error::other(error.message))?;
             shortcut::register_quick_access(app.handle());
             shortcut::register_hold_zoom_shortcut(app.handle());
             shortcut::register_capture_hotkeys(app.handle());
@@ -97,6 +101,11 @@ pub fn run() {
             commands::recording_windows::show_recording_toolbar,
             commands::recording_windows::hide_recording_toolbar,
             commands::screenshot::capture_screenshot,
+            commands::library::list_library_items,
+            commands::library::get_library_thumbnail,
+            commands::library::open_library_item,
+            commands::library::reveal_library_item,
+            commands::library::open_library_folder,
             editor::commands::get_screenshot_editor_metadata,
             editor::commands::get_screenshot_editor_source,
             editor::commands::save_screenshot_editor,
@@ -122,6 +131,7 @@ pub mod capture;
 mod commands;
 pub mod editor;
 mod errors;
+pub mod library;
 pub mod recording;
 pub mod screenshot;
 pub mod settings;

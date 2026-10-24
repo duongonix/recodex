@@ -130,6 +130,10 @@
         </SelectContent>
       </SelectRoot>
     </div>
+    <button class="refresh-button" type="button" disabled={loading} onclick={refresh} aria-label="Refresh open windows">
+      <RefreshCw aria-hidden="true" class={loading ? "size-4 spin" : "size-4"} />
+      <span>Refresh</span>
+    </button>
   </section>
 
   {#if error}
@@ -188,6 +192,9 @@
   input[type="search"]::placeholder { color: var(--wp-muted-strong); }
   .sort-control { display: flex; align-items: center; gap: 9px; color: var(--wp-muted); font-size: 11px; white-space: nowrap; }
   :global(.sort-trigger) { width: 148px; height: 38px; border-color: var(--wp-border); border-radius: 9px; background: var(--wp-surface); color: var(--wp-text-secondary); font-size: 12px; }
+  .refresh-button { display: inline-flex; height: 38px; flex: none; align-items: center; justify-content: center; gap: 7px; padding: 0 11px; border: 1px solid var(--wp-border); border-radius: 9px; background: var(--wp-surface); color: var(--wp-text-secondary); font: inherit; font-size: 12px; }
+  .refresh-button:hover:not(:disabled) { border-color: var(--wp-accent-bright); color: var(--wp-text); }
+  .refresh-button:disabled { opacity: .65; cursor: wait; }
   .window-list { flex: 1; min-height: 0; overflow: auto; padding: 18px 26px 22px; scrollbar-color: color-mix(in srgb, var(--wp-accent) 48%, var(--wp-border)) var(--wp-bg); scrollbar-width: thin; }
   .window-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); align-content: start; gap: 14px; }
   .loading-state { display: flex; min-height: 220px; align-items: center; justify-content: center; gap: 11px; color: var(--wp-muted); font-size: 13px; }

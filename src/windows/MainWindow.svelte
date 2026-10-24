@@ -14,6 +14,7 @@
   import SettingsView from "../lib/components/settings/SettingsView.svelte";
   import AboutView from "../lib/components/about/AboutView.svelte";
   import UpdateView from "../lib/components/shared/UpdateView.svelte";
+  import LibraryView from "../features/library/components/LibraryView.svelte";
   import WindowTitleBar from "../lib/components/recorder/WindowTitleBar.svelte";
   import ActiveRecordingPanel from "../lib/components/recorder/ActiveRecordingPanel.svelte";
   import VideoOptions from "../lib/components/recorder/VideoOptions.svelte";
@@ -63,6 +64,7 @@
   let settingsOpen = $state(false);
   let aboutOpen = $state(false);
   let updateOpen = $state(false);
+  let libraryOpen = $state(false);
   let settingsTab = $state<SettingsTab>("snap");
   let startupLabel = $state("Start with system");
   let shortcutStatus = $state<QuickAccessShortcutStatus | null>(null);
@@ -90,6 +92,7 @@
   let lastNotifiedRecordingError: string | null = null;
 
   function openSettings() {
+    libraryOpen = false;
     updateOpen = false;
     aboutOpen = false;
     settingsOpen = true;
@@ -110,7 +113,22 @@
   function openUpdate() {
     settingsOpen = false;
     aboutOpen = false;
+    libraryOpen = false;
     updateOpen = true;
+  }
+
+  function openLibrary() {
+    settingsOpen = false;
+    aboutOpen = false;
+    updateOpen = false;
+    libraryOpen = true;
+  }
+
+  function openAbout() {
+    settingsOpen = false;
+    updateOpen = false;
+    libraryOpen = false;
+    aboutOpen = true;
   }
 
   function systemStartupLabel(): string {
@@ -520,28 +538,35 @@
   class:settings-open={settingsOpen}
   class:about-open={aboutOpen}
   class:update-open={updateOpen}
+  class:library-open={libraryOpen}
   data-tauri-drag-region="false"
   aria-labelledby="main-title"
 >
   <WindowTitleBar
     desktopApp={preferences.desktopApp}
     settingsActive={settingsOpen || aboutOpen || updateOpen}
+    libraryActive={libraryOpen}
     minimizeToTray={preferences.settings?.minimizeToTray ?? true}
     settingsDisabled={!preferences.desktopApp || !preferences.settings}
+    libraryDisabled={!preferences.desktopApp || sessionActive}
     settingsTitle={preferences.error ?? "Recording and screenshot preferences."}
     onSettings={openSettings}
-    onAbout={() => (aboutOpen = true)}
+    onAbout={openAbout}
+    onLibrary={openLibrary}
     onUpdate={openUpdate}
     onBack={() => {
       settingsOpen = false;
       aboutOpen = false;
       updateOpen = false;
+      libraryOpen = false;
     }}
     onWindowError={(message) => console.error(`[RecoDex] Window control error: ${message}`)}
   />
 
   {#if updateOpen}
     <UpdateView />
+  {:else if libraryOpen}
+    <LibraryView onBack={() => (libraryOpen = false)} />
   {:else if aboutOpen}
     <AboutView />
   {:else if settingsOpen}

@@ -1,8 +1,8 @@
 <script lang="ts">
   import { getCurrentWindow } from "@tauri-apps/api/window";
   import ArrowLeft from "@lucide/svelte/icons/arrow-left";
-  import CircleDot from "@lucide/svelte/icons/circle-dot";
   import Info from "@lucide/svelte/icons/info";
+  import Library from "@lucide/svelte/icons/library";
   import AppUpdateButton from "../shared/AppUpdateButton.svelte";
   import Minus from "@lucide/svelte/icons/minus";
   import Settings from "@lucide/svelte/icons/settings";
@@ -15,10 +15,13 @@
   let {
     desktopApp,
     settingsActive = false,
+    libraryActive = false,
     minimizeToTray = true,
     settingsDisabled,
+    libraryDisabled = false,
     settingsTitle,
     onSettings,
+    onLibrary,
     onAbout,
     onUpdate,
     onBack = () => {},
@@ -26,10 +29,13 @@
   }: {
     desktopApp: boolean;
     settingsActive?: boolean;
+    libraryActive?: boolean;
     minimizeToTray?: boolean;
     settingsDisabled: boolean;
+    libraryDisabled?: boolean;
     settingsTitle: string;
     onSettings: () => void;
+    onLibrary: () => void;
     onAbout: () => void;
     onUpdate: () => void;
     onBack?: () => void;
@@ -63,7 +69,7 @@
         <ArrowLeft aria-hidden="true" class="size-[18px]" />
       </Button>
     {/if}
-    <span class="brand-mark" aria-hidden="true"><CircleDot class="size-4" /></span>
+    <span class="brand-mark" aria-hidden="true"><img src="/icon.png" alt="" draggable="false" /></span>
     <h1 id="main-title">RecoDex</h1>
   </div>
   <div class="titlebar-actions">
@@ -89,6 +95,18 @@
       onclick={onSettings}
     >
       <Settings aria-hidden="true" class="size-[18px]" />
+    </Button>
+    <Button
+      variant="ghost"
+      size="icon"
+      disabled={libraryDisabled}
+      aria-label="Capture library"
+      aria-pressed={libraryActive}
+      title="Capture library"
+      class={libraryActive ? "library-button active" : "library-button"}
+      onclick={onLibrary}
+    >
+      <Library aria-hidden="true" class="size-[18px]" />
     </Button>
     {/if}
     {#if desktopApp}

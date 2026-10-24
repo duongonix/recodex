@@ -134,6 +134,19 @@ pub fn save_screenshot_editor(
         }
     };
 
+    if let Some(path) = output_path.as_deref()
+        && let Err(error) = state.capture_library.register(
+            &PathBuf::from(path),
+            crate::library::LibraryItemKind::Screenshot,
+            None,
+        )
+    {
+        eprintln!(
+            "[RecoDex][library] Could not register the saved screenshot: {}",
+            error.message
+        );
+    }
+
     Ok(EditorExportResult {
         width,
         height,

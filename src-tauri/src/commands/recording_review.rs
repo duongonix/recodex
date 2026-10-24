@@ -352,6 +352,18 @@ fn finish_review<R: Runtime>(
         .output_path
         .as_ref()
         .map(|path| path.to_string_lossy().into_owned());
+    if let Some(path) = outcome.output_path.as_deref()
+        && let Err(error) = state.capture_library.register(
+            path,
+            crate::library::LibraryItemKind::Video,
+            Some(outcome.duration_ms),
+        )
+    {
+        eprintln!(
+            "[RecoDex][library] Could not register the saved recording: {}",
+            error.message
+        );
+    }
     let event = state
         .recording
         .lock()
@@ -436,6 +448,18 @@ fn finish_review_edit<R: Runtime>(
         .iter()
         .map(|path| path.to_string_lossy().into_owned())
         .collect();
+    for path in &outcome.output_paths {
+        if let Err(error) =
+            state
+                .capture_library
+                .register(path, crate::library::LibraryItemKind::Video, None)
+        {
+            eprintln!(
+                "[RecoDex][library] Could not register an edited recording: {}",
+                error.message
+            );
+        }
+    }
     let primary_output = output_paths.first().ok_or_else(|| {
         IpcError::internal("The recording edit completed without an output file.")
     })?;

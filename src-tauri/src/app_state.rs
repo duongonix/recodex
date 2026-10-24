@@ -64,6 +64,7 @@ pub struct AppState {
     pub video_editor_export_active: Arc<AtomicBool>,
     pub video_editor_export_cancelled: Arc<AtomicBool>,
     pub webcam: crate::webcam::manager::WebcamManager,
+    pub capture_library: crate::library::CaptureLibrary,
 }
 
 impl AppState {
@@ -88,6 +89,7 @@ impl AppState {
             video_editor_export_active: Arc::new(AtomicBool::new(false)),
             video_editor_export_cancelled: Arc::new(AtomicBool::new(false)),
             webcam: crate::webcam::manager::WebcamManager::default(),
+            capture_library: crate::library::CaptureLibrary::default(),
         }
     }
 }

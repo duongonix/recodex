@@ -1,5 +1,4 @@
 <script lang="ts">
-  import AppWindow from "@lucide/svelte/icons/app-window";
   import X from "@lucide/svelte/icons/x";
 
   let { onClose }: { onClose: () => void } = $props();
@@ -7,7 +6,7 @@
 
 <header class="picker-header" data-tauri-drag-region>
   <div class="title-row" data-tauri-drag-region>
-    <span class="title-icon"><AppWindow aria-hidden="true" class="size-5" /></span>
+    <span class="title-icon"><img src="/icon.png" alt="" draggable="false" /></span>
     <div data-tauri-drag-region>
       <h1>Choose a window</h1>
       <p>Select a window to capture</p>
@@ -41,6 +40,7 @@
     background: color-mix(in srgb, var(--wp-accent) 10%, transparent);
     color: var(--wp-accent-bright);
   }
+  .title-icon img { width: 30px; height: 30px; object-fit: contain; }
   h1 { margin: 0; color: var(--wp-text); font-size: 18px; font-weight: 650; letter-spacing: -0.02em; }
   p { margin: 4px 0 0; color: var(--wp-muted); font-size: 12px; }
   .icon-button {

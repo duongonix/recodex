@@ -179,6 +179,82 @@ pub fn extract_audio_waveform(
     Ok(peaks)
 }
 
+/// Decodes one small native video frame for the capture library. This path runs in a blocking
+/// worker and returns only a compressed thumbnail to the main window.
+pub fn extract_library_video_thumbnail(input_path: &Path) -> Result<Vec<u8>, IpcError> {
+    let _runtime = MediaFoundationRuntime::initialize()?;
+    let reader = open_reader(input_path)?;
+    let stream = MF_SOURCE_READER_FIRST_VIDEO_STREAM.0 as u32;
+    let source_type = unsafe {
+        reader
+            .GetNativeMediaType(stream, 0)
+            .map_err(|error| mf_error("Could not inspect the capture's video stream", error))?
+    };
+    let frame_size = unsafe {
+        source_type
+            .GetUINT64(&MF_MT_FRAME_SIZE)
+            .map_err(|error| mf_error("Could not read the capture's video dimensions", error))?
+    };
+    let source_width = (frame_size >> 32) as u32;
+    let source_height = frame_size as u32;
+    if source_width < 2 || source_height < 2 {
+        return Err(IpcError::new(
+            "recording_video_format_invalid",
+            "The capture does not contain valid video dimensions.",
+            true,
+        ));
+    }
+    let frame_rate = unsafe {
+        source_type
+            .GetUINT64(&MF_MT_FRAME_RATE)
+            .map_err(|error| mf_error("Could not read the capture's frame rate", error))?
+    };
+    let numerator = (frame_rate >> 32) as u32;
+    let denominator = frame_rate as u32;
+    let fps = if numerator == 0 || denominator == 0 {
+        30
+    } else {
+        ((numerator + denominator / 2) / denominator).clamp(1, 120) as u16
+    };
+    let aspect = f64::from(source_width) / f64::from(source_height);
+    let (width, height) = if aspect >= 16.0 / 9.0 {
+        (192, ((192.0 / aspect).round() as u32).max(2) & !1)
+    } else {
+        (((108.0 * aspect).round() as u32).max(2) & !1, 108)
+    };
+    let decoded_type = create_video_type(width, height, fps, false)?;
+    unsafe {
+        reader
+            .SetCurrentMediaType(stream, None::<*const u32>, &decoded_type)
+            .map_err(|error| mf_error("Windows could not prepare the library thumbnail", error))?;
+    }
+    let video_reader = SampleReader::new(reader, stream);
+    video_reader.seek_to(0)?;
+    let frame = video_reader.next()?.ok_or_else(|| {
+        IpcError::new(
+            "library_thumbnail_missing",
+            "The video does not contain a decodable thumbnail frame.",
+            true,
+        )
+    })?;
+    let frame_bytes = normalize_decoded_bgra_frame(frame.bytes, width, height)?;
+    let mut rgb = Vec::with_capacity((width * height * 3) as usize);
+    for [blue, green, red, _alpha] in frame_bytes.as_chunks::<4>().0 {
+        rgb.extend_from_slice(&[*red, *green, *blue]);
+    }
+    let image = image::RgbImage::from_raw(width, height, rgb)
+        .ok_or_else(|| IpcError::internal("The decoded library thumbnail pixels were invalid."))?;
+    let mut encoded = Vec::new();
+    JpegEncoder::new_with_quality(&mut encoded, 72)
+        .encode_image(&DynamicImage::ImageRgb8(image))
+        .map_err(|error| {
+            IpcError::internal(format!(
+                "Could not encode the video library thumbnail: {error}"
+            ))
+        })?;
+    Ok(encoded)
+}
+
 pub fn extract_video_thumbnails(
     input_path: &Path,
     duration_ms: u64,

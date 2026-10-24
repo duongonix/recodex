@@ -1,6 +1,6 @@
 [package]
 name = "recodex"
-version = "0.1.4"
+version = "0.1.5"
 description = "Lightweight desktop screen recorder and screenshot app"
 edition = "2024"
 
@@ -50,6 +50,7 @@ windows = { version = "0.62.2", features = [
 ] }
 windows-sys = { version = "0.61.2", features = [
     "Win32_Foundation",
+    "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
     "Win32_Storage_FileSystem",
     "Win32_System_Threading",

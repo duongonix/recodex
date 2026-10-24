@@ -1,5 +1,6 @@
 pub mod audio;
 pub mod capture;
+pub mod library;
 pub mod recording;
 pub mod recording_review;
 pub mod recording_shutdown;

@@ -24,7 +24,8 @@ body {
 
 .main-window.settings-open,
 .main-window.about-open,
-.main-window.update-open {
+.main-window.update-open,
+.main-window.library-open {
   grid-template-rows: 42px minmax(0, 1fr);
   align-content: stretch;
 }
@@ -110,6 +111,12 @@ body {
   color: var(--accent);
 }
 
+.main-window .brand-mark img {
+  width: 23px;
+  height: 23px;
+  object-fit: contain;
+}
+
 .main-window h1 {
   margin: 0;
   font-size: 15px;
@@ -119,6 +126,7 @@ body {
 
 .main-window .settings-button,
 .main-window .about-button,
+.main-window .library-button,
 .main-window .update-button {
   width: 32px;
   height: 32px;
@@ -127,6 +135,13 @@ body {
 
 .main-window .about-button:hover:not(:disabled) {
   background: var(--surface-hover);
+  color: var(--accent);
+}
+
+.main-window .library-button:hover:not(:disabled),
+.main-window .library-button.active {
+  border: 1px solid color-mix(in srgb, var(--accent) 54%, var(--border));
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface));
   color: var(--accent);
 }
 

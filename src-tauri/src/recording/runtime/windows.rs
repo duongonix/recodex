@@ -1,4 +1,5 @@
 use std::{
+    path::Path,
     sync::{
         Arc, Mutex,
         mpsc::{Receiver, SyncSender, TryRecvError},
@@ -31,8 +32,6 @@ pub(super) fn run_platform(
     commands: Receiver<WorkerCommand>,
     ready: &mut Option<SyncSender<Result<(), IpcError>>>,
 ) -> Result<(), IpcError> {
-    use std::path::Path;
-
     use crate::{
         audio::{AudioCapture, AudioMixer},
         capture::{
@@ -645,6 +644,7 @@ pub(super) fn run_platform(
                 );
                 let mut pending = pending;
                 let output_path = pending.save()?;
+                register_completed_video(&app, &output_path, current_duration);
                 transition_and_emit(
                     &app,
                     &session,
@@ -661,6 +661,7 @@ pub(super) fn run_platform(
         }
     } else {
         let output_path = output.finalize()?;
+        register_completed_video(&app, &output_path, current_duration);
         transition_and_emit(
             &app,
             &session,
@@ -682,6 +683,21 @@ pub(super) fn run_platform(
         let _ = pending_stop.send(Ok(snapshot));
     }
     Ok(())
+}
+
+fn register_completed_video(app: &AppHandle, path: &Path, duration_ms: u64) {
+    if let Some(state) = app.try_state::<crate::app_state::AppState>()
+        && let Err(error) = state.capture_library.register(
+            path,
+            crate::library::LibraryItemKind::Video,
+            Some(duration_ms),
+        )
+    {
+        eprintln!(
+            "[RecoDex][library] Could not register the saved recording: {}",
+            error.message
+        );
+    }
 }
 
 fn emit_webcam_warning(app: &AppHandle, message: &str) {

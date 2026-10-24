@@ -12,7 +12,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 
 use crate::{capture::sources::DisplaySource, errors::IpcError, recording::CaptureTarget};
 
-use super::cursor::CursorTarget;
+use super::{
+    cursor::CursorTarget,
+    window_discovery::{is_user_application_window, is_window_cloaked},
+};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct CropRect {
@@ -215,6 +218,8 @@ fn resolve_window(window_id: &str) -> Result<(Window, isize), IpcError> {
     if unsafe { IsWindow(hwnd) } == 0
         || unsafe { IsWindowVisible(hwnd) } == 0
         || unsafe { IsIconic(hwnd) } != 0
+        || is_window_cloaked(hwnd)
+        || !is_user_application_window(hwnd)
     {
         return Err(invalid_window());
     }

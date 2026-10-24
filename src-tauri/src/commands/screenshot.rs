@@ -190,13 +190,26 @@ pub async fn capture_screenshot(
             true,
         ));
     }
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         capture_with_main_hidden(&app, || {
             crate::screenshot::capture(&app, request, &output_directory)
         })
     })
     .await
-    .map_err(|error| IpcError::internal(format!("Screenshot capture worker failed: {error}")))?
+    .map_err(|error| IpcError::internal(format!("Screenshot capture worker failed: {error}")))??;
+    if let Some(path) = result.output_path.as_deref()
+        && let Err(error) = state.capture_library.register(
+            &PathBuf::from(path),
+            crate::library::LibraryItemKind::Screenshot,
+            None,
+        )
+    {
+        eprintln!(
+            "[RecoDex][library] Could not register the saved screenshot: {}",
+            error.message
+        );
+    }
+    Ok(result)
 }
 
 fn capture_with_main_hidden<T>(

@@ -67,7 +67,7 @@
     color: var(--wp-muted);
     font-size: 11px;
   }
-  img { width: 100%; height: 100%; object-fit: cover; }
+  img { width: 100%; height: 100%; object-fit: contain; }
   .skeleton { position: absolute; inset: 0; background: linear-gradient(100deg, var(--wp-surface) 25%, var(--wp-surface-hover) 40%, var(--wp-surface) 55%); background-size: 220% 100%; animation: shimmer 1.4s ease infinite; }
   :global(.spin) { animation: spin 1.2s linear infinite; }
   @keyframes shimmer { to { background-position-x: -220%; } }
